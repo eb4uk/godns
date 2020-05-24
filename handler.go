@@ -1,6 +1,8 @@
 package main
 
 import (
+	cache2 "github.com/eb4uk/godns/cache"
+	"github.com/eb4uk/godns/models"
 	"github.com/eb4uk/godns/settings"
 	"net"
 	"time"
@@ -14,19 +16,9 @@ const (
 	_IP6Query  = 6
 )
 
-type Question struct {
-	qname  string
-	qtype  string
-	qclass string
-}
-
-func (q *Question) String() string {
-	return q.qname + " " + q.qclass + " " + q.qtype
-}
-
 type GODNSHandler struct {
 	resolver        *Resolver
-	cache, negCache Cache
+	cache, negCache cache2.Cache
 	hosts           Hosts
 }
 
@@ -35,7 +27,7 @@ func NewHandler() *GODNSHandler {
 	var (
 		cacheConfig     settings.CacheSettings
 		resolver        *Resolver
-		cache, negCache Cache
+		cache, negCache cache2.Cache
 	)
 
 	resolver = NewResolver(settings.Config.ResolvConfig)
@@ -43,28 +35,28 @@ func NewHandler() *GODNSHandler {
 	cacheConfig = settings.Config.Cache
 	switch cacheConfig.Backend {
 	case "memory":
-		cache = &MemoryCache{
-			Backend:  make(map[string]Mesg, cacheConfig.Maxcount),
+		cache = &cache2.MemoryCache{
+			Backend:  make(map[string]cache2.Mesg, cacheConfig.Maxcount),
 			Expire:   time.Duration(cacheConfig.Expire) * time.Second,
 			Maxcount: cacheConfig.Maxcount,
 		}
-		negCache = &MemoryCache{
-			Backend:  make(map[string]Mesg),
+		negCache = &cache2.MemoryCache{
+			Backend:  make(map[string]cache2.Mesg),
 			Expire:   time.Duration(cacheConfig.Expire) * time.Second / 2,
 			Maxcount: cacheConfig.Maxcount,
 		}
 	case "memcache":
-		cache = NewMemcachedCache(
+		cache = cache2.NewMemcachedCache(
 			settings.Config.Memcache.Servers,
 			int32(cacheConfig.Expire))
-		negCache = NewMemcachedCache(
+		negCache = cache2.NewMemcachedCache(
 			settings.Config.Memcache.Servers,
 			int32(cacheConfig.Expire/2))
 	case "redis":
-		cache = NewRedisCache(
+		cache = cache2.NewRedisCache(
 			settings.Config.Redis,
 			int64(cacheConfig.Expire))
-		negCache = NewRedisCache(
+		negCache = cache2.NewRedisCache(
 			settings.Config.Redis,
 			int64(cacheConfig.Expire/2))
 	default:
@@ -82,7 +74,7 @@ func NewHandler() *GODNSHandler {
 
 func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
-	Q := Question{UnFqdn(q.Name), dns.TypeToString[q.Qtype], dns.ClassToString[q.Qclass]}
+	Q := models.Question{UnFqdn(q.Name), dns.TypeToString[q.Qtype], dns.ClassToString[q.Qclass]}
 
 	var remote net.IP
 	if Net == "tcp" {
@@ -90,13 +82,14 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 	} else {
 		remote = w.RemoteAddr().(*net.UDPAddr).IP
 	}
+	//TODO Check is specific key set up
 	logger.Info("%s lookup　%s", remote, Q.String())
 
 	IPQuery := h.isIPQuery(q)
 
 	// Query hosts
 	if settings.Config.Hosts.Enable && IPQuery > 0 {
-		if ips, ok := h.hosts.Get(Q.qname, IPQuery); ok {
+		if ips, ok := h.hosts.Get(Q.Name, IPQuery); ok {
 			m := new(dns.Msg)
 			m.SetReply(req)
 
@@ -126,14 +119,14 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 			}
 
 			w.WriteMsg(m)
-			logger.Debug("%s found in hosts file", Q.qname)
+			logger.Debug("%s found in hosts file", Q.Name)
 			return
 		} else {
-			logger.Debug("%s didn't found in hosts file", Q.qname)
+			logger.Debug("%s didn't found in hosts file", Q.Name)
 		}
 	}
 
-	key := KeyGen(Q)
+	key := cache2.KeyGen(Q)
 	mesg, err := h.cache.Get(key)
 	if err != nil {
 		if mesg, err = h.negCache.Get(key); err != nil {
