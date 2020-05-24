@@ -11,6 +11,8 @@ Similar to [dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html), but support
 
 * Auto-Reloads when hosts configuration is changed. (Yes, dnsmasq needs to be reloaded)
 
+* Per client dns responses
+
 
 ## Installation & Running
 
