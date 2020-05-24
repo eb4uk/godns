@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/eb4uk/godns/settings"
 	"net"
 	"time"
 
@@ -32,14 +33,14 @@ type GODNSHandler struct {
 func NewHandler() *GODNSHandler {
 
 	var (
-		cacheConfig     CacheSettings
+		cacheConfig     settings.CacheSettings
 		resolver        *Resolver
 		cache, negCache Cache
 	)
 
-	resolver = NewResolver(settings.ResolvConfig)
+	resolver = NewResolver(settings.Config.ResolvConfig)
 
-	cacheConfig = settings.Cache
+	cacheConfig = settings.Config.Cache
 	switch cacheConfig.Backend {
 	case "memory":
 		cache = &MemoryCache{
@@ -54,17 +55,17 @@ func NewHandler() *GODNSHandler {
 		}
 	case "memcache":
 		cache = NewMemcachedCache(
-			settings.Memcache.Servers,
+			settings.Config.Memcache.Servers,
 			int32(cacheConfig.Expire))
 		negCache = NewMemcachedCache(
-			settings.Memcache.Servers,
+			settings.Config.Memcache.Servers,
 			int32(cacheConfig.Expire/2))
 	case "redis":
 		cache = NewRedisCache(
-			settings.Redis,
+			settings.Config.Redis,
 			int64(cacheConfig.Expire))
 		negCache = NewRedisCache(
-			settings.Redis,
+			settings.Config.Redis,
 			int64(cacheConfig.Expire/2))
 	default:
 		logger.Error("Invalid cache backend %s", cacheConfig.Backend)
@@ -72,8 +73,8 @@ func NewHandler() *GODNSHandler {
 	}
 
 	var hosts Hosts
-	if settings.Hosts.Enable {
-		hosts = NewHosts(settings.Hosts, settings.Redis)
+	if settings.Config.Hosts.Enable {
+		hosts = NewHosts(settings.Config.Hosts, settings.Config.Redis)
 	}
 
 	return &GODNSHandler{resolver, cache, negCache, hosts}
@@ -94,7 +95,7 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 	IPQuery := h.isIPQuery(q)
 
 	// Query hosts
-	if settings.Hosts.Enable && IPQuery > 0 {
+	if settings.Config.Hosts.Enable && IPQuery > 0 {
 		if ips, ok := h.hosts.Get(Q.qname, IPQuery); ok {
 			m := new(dns.Msg)
 			m.SetReply(req)
@@ -105,7 +106,7 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 					Name:   q.Name,
 					Rrtype: dns.TypeA,
 					Class:  dns.ClassINET,
-					Ttl:    settings.Hosts.TTL,
+					Ttl:    settings.Config.Hosts.TTL,
 				}
 				for _, ip := range ips {
 					a := &dns.A{rr_header, ip}
@@ -116,7 +117,7 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 					Name:   q.Name,
 					Rrtype: dns.TypeAAAA,
 					Class:  dns.ClassINET,
-					Ttl:    settings.Hosts.TTL,
+					Ttl:    settings.Config.Hosts.TTL,
 				}
 				for _, ip := range ips {
 					aaaa := &dns.AAAA{rr_header, ip}

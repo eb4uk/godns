@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"github.com/eb4uk/godns/settings"
 	"net"
 	"os"
 	"strings"
@@ -18,7 +19,7 @@ type Hosts struct {
 	refreshInterval time.Duration
 }
 
-func NewHosts(hs HostsSettings, rs RedisSettings) Hosts {
+func NewHosts(hs settings.HostsSettings, rs settings.RedisSettings) Hosts {
 	fileHosts := &FileHosts{
 		file:  hs.HostsFile,
 		hosts: make(map[string]string),
