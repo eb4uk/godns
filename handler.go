@@ -1,7 +1,7 @@
 package main
 
 import (
-	cache2 "github.com/eb4uk/godns/cache"
+	cache "github.com/eb4uk/godns/cache"
 	"github.com/eb4uk/godns/models"
 	"github.com/eb4uk/godns/settings"
 	"net"
@@ -18,63 +18,72 @@ const (
 
 type GODNSHandler struct {
 	resolver        *Resolver
-	cache, negCache cache2.Cache
+	cache, negCache cache.Cache
 	hosts           Hosts
 }
 
 func NewHandler() *GODNSHandler {
 
 	var (
-		cacheConfig     settings.CacheSettings
-		resolver        *Resolver
-		cache, negCache cache2.Cache
+		cacheConfig       settings.CacheSettings
+		resolver          *Resolver
+		caching, negCache cache.Cache
 	)
 
 	resolver = NewResolver(settings.Config.ResolvConfig)
 
 	cacheConfig = settings.Config.Cache
-	switch cacheConfig.Backend {
-	case "memory":
-		cache = &cache2.MemoryCache{
-			Backend:  make(map[string]cache2.Mesg, cacheConfig.Maxcount),
-			Expire:   time.Duration(cacheConfig.Expire) * time.Second,
-			Maxcount: cacheConfig.Maxcount,
-		}
-		negCache = &cache2.MemoryCache{
-			Backend:  make(map[string]cache2.Mesg),
-			Expire:   time.Duration(cacheConfig.Expire) * time.Second / 2,
-			Maxcount: cacheConfig.Maxcount,
-		}
-	case "memcache":
-		cache = cache2.NewMemcachedCache(
-			settings.Config.Memcache.Servers,
-			int32(cacheConfig.Expire))
-		negCache = cache2.NewMemcachedCache(
-			settings.Config.Memcache.Servers,
-			int32(cacheConfig.Expire/2))
-	case "redis":
-		cache = cache2.NewRedisCache(
-			settings.Config.Redis,
-			int64(cacheConfig.Expire))
-		negCache = cache2.NewRedisCache(
-			settings.Config.Redis,
-			int64(cacheConfig.Expire/2))
-	default:
-		logger.Error("Invalid cache backend %s", cacheConfig.Backend)
-		panic("Invalid cache backend")
-	}
+	caching, negCache = selectCacheType(cacheConfig)
 
 	var hosts Hosts
 	if settings.Config.Hosts.Enable {
 		hosts = NewHosts(settings.Config.Hosts, settings.Config.Redis)
 	}
 
-	return &GODNSHandler{resolver, cache, negCache, hosts}
+	return &GODNSHandler{resolver, caching, negCache, hosts}
+}
+
+func selectCacheType(cacheConfig settings.CacheSettings) (caching cache.Cache, negCache cache.Cache) {
+	switch cacheConfig.Backend {
+	case "memory":
+		caching = &cache.MemoryCache{
+			Backend:  make(map[string]cache.Mesg, cacheConfig.Maxcount),
+			Expire:   time.Duration(cacheConfig.Expire) * time.Second,
+			Maxcount: cacheConfig.Maxcount,
+		}
+		negCache = &cache.MemoryCache{
+			Backend:  make(map[string]cache.Mesg),
+			Expire:   time.Duration(cacheConfig.Expire) * time.Second / 2,
+			Maxcount: cacheConfig.Maxcount,
+		}
+	case "memcache":
+		caching = cache.NewMemcachedCache(
+			settings.Config.Memcache.Servers,
+			int32(cacheConfig.Expire))
+		negCache = cache.NewMemcachedCache(
+			settings.Config.Memcache.Servers,
+			int32(cacheConfig.Expire/2))
+	case "redis":
+		caching = cache.NewRedisCache(
+			settings.Config.Redis,
+			int64(cacheConfig.Expire))
+		negCache = cache.NewRedisCache(
+			settings.Config.Redis,
+			int64(cacheConfig.Expire/2))
+	default:
+		logger.Error("Invalid caching backend %s", cacheConfig.Backend)
+		panic("Invalid caching backend")
+	}
+	return caching, negCache
 }
 
 func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 	q := req.Question[0]
-	Q := models.Question{UnFqdn(q.Name), dns.TypeToString[q.Qtype], dns.ClassToString[q.Qclass]}
+	Q := models.Question{
+		Name:  UnFqdn(q.Name),
+		Type:  dns.TypeToString[q.Qtype],
+		Class: dns.ClassToString[q.Qclass],
+	}
 
 	var remote net.IP
 	if Net == "tcp" {
@@ -126,10 +135,10 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 		}
 	}
 
-	key := cache2.KeyGen(Q)
-	mesg, err := h.cache.Get(key)
+	key := cache.KeyGen(Q)
+	msg, err := h.cache.Get(key)
 	if err != nil {
-		if mesg, err = h.negCache.Get(key); err != nil {
+		if msg, err = h.negCache.Get(key); err != nil {
 			logger.Debug("%s didn't hit cache", Q.String())
 		} else {
 			logger.Debug("%s hit negative cache", Q.String())
@@ -139,13 +148,13 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 	} else {
 		logger.Debug("%s hit cache", Q.String())
 		// we need this copy against concurrent modification of Id
-		msg := *mesg
+		msg := *msg
 		msg.Id = req.Id
 		w.WriteMsg(&msg)
 		return
 	}
 
-	mesg, err = h.resolver.Lookup(Net, req)
+	msg, err = h.resolver.Lookup(Net, req)
 
 	if err != nil {
 		logger.Warn("Resolve query error %s", err)
@@ -158,10 +167,10 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	w.WriteMsg(mesg)
+	w.WriteMsg(msg)
 
-	if len(mesg.Answer) > 0 {
-		err = h.cache.Set(key, mesg)
+	if len(msg.Answer) > 0 {
+		err = h.cache.Set(key, msg)
 		if err != nil {
 			logger.Warn("Set %s cache failed: %s", Q.String(), err.Error())
 		}
