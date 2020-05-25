@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/eb4uk/godns/models"
+	"github.com/eb4uk/godns/settings"
 	"net"
 	"os"
 	"strconv"
@@ -32,10 +34,10 @@ type RResp struct {
 type Resolver struct {
 	servers       []string
 	domain_server *suffixTreeNode
-	config        *ResolvSettings
+	config        *models.ResolvSettings
 }
 
-func NewResolver(c ResolvSettings) *Resolver {
+func NewResolver(c models.ResolvSettings) *Resolver {
 	r := &Resolver{
 		servers:       []string{},
 		domain_server: newSuffixTreeRoot(),
@@ -135,7 +137,7 @@ func (r *Resolver) Lookup(net string, req *dns.Msg) (message *dns.Msg, err error
 		WriteTimeout: r.Timeout(),
 	}
 
-	if net == "udp" && settings.ResolvConfig.SetEDNS0 {
+	if net == "udp" && settings.Config.ResolvConfig.SetEDNS0 {
 		req = req.SetEdns0(65535, true)
 	}
 
@@ -168,7 +170,7 @@ func (r *Resolver) Lookup(net string, req *dns.Msg) (message *dns.Msg, err error
 		}
 	}
 
-	ticker := time.NewTicker(time.Duration(settings.ResolvConfig.Interval) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(settings.Config.ResolvConfig.Interval) * time.Millisecond)
 	defer ticker.Stop()
 	// Start lookup on each nameserver top-down, in every second
 	nameservers := r.Nameservers(qname)

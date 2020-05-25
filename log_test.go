@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"github.com/eb4uk/godns/models"
 	"os"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 func TestConsole(t *testing.T) {
 	logger := NewLogger()
 	logger.SetLogger("console", nil)
-	logger.SetLevel(LevelInfo)
+	logger.SetLevel(models.LevelInfo)
 
 	logger.Debug("debug")
 	logger.Info("info")
@@ -24,7 +25,7 @@ func TestConsole(t *testing.T) {
 func TestFile(t *testing.T) {
 	logger := NewLogger()
 	logger.SetLogger("file", map[string]interface{}{"file": "test.log"})
-	logger.SetLevel(LevelInfo)
+	logger.SetLevel(models.LevelInfo)
 
 	logger.Debug("debug")
 	logger.Info("info")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/eb4uk/godns/settings"
 	"os"
 	"os/signal"
 	"runtime"
@@ -13,21 +14,21 @@ var (
 )
 
 func main() {
-
+	settings.InitializeConfig()
 	initLogger()
 
 	server := &Server{
-		host:     settings.Server.Host,
-		port:     settings.Server.Port,
+		host:     settings.Config.Server.Host,
+		port:     settings.Config.Server.Port,
 		rTimeout: 5 * time.Second,
 		wTimeout: 5 * time.Second,
 	}
 
 	server.Run()
 
-	logger.Info("godns %s start", settings.Version)
+	logger.Info("godns %s start", settings.Config.Version)
 
-	if settings.Debug {
+	if settings.Config.Debug {
 		go profileCPU()
 		go profileMEM()
 	}
@@ -78,16 +79,16 @@ func profileMEM() {
 func initLogger() {
 	logger = NewLogger()
 
-	if settings.Log.Stdout {
+	if settings.Config.Log.Stdout {
 		logger.SetLogger("console", nil)
 	}
 
-	if settings.Log.File != "" {
-		config := map[string]interface{}{"file": settings.Log.File}
+	if settings.Config.Log.File != "" {
+		config := map[string]interface{}{"file": settings.Config.Log.File}
 		logger.SetLogger("file", config)
 	}
 
-	logger.SetLevel(settings.Log.LogLevel())
+	logger.SetLevel(settings.Config.Log.LogLevel())
 }
 
 func init() {
