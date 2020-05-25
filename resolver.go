@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"github.com/eb4uk/godns/models"
 	"github.com/eb4uk/godns/settings"
 	"net"
 	"os"
@@ -33,10 +34,10 @@ type RResp struct {
 type Resolver struct {
 	servers       []string
 	domain_server *suffixTreeNode
-	config        *settings.ResolvSettings
+	config        *models.ResolvSettings
 }
 
-func NewResolver(c settings.ResolvSettings) *Resolver {
+func NewResolver(c models.ResolvSettings) *Resolver {
 	r := &Resolver{
 		servers:       []string{},
 		domain_server: newSuffixTreeRoot(),

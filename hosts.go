@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
-	"github.com/eb4uk/godns/settings"
+	"github.com/eb4uk/godns/infrastructure"
+	"github.com/eb4uk/godns/models"
+	"github.com/eb4uk/godns/targeting"
 	"net"
 	"os"
 	"strings"
@@ -14,18 +16,21 @@ import (
 )
 
 type Hosts struct {
-	fileHosts       *FileHosts
-	redisHosts      *RedisHosts
+	fileHosts   *FileHosts
+	redisHosts  *RedisHosts
+	callerHosts targeting.CallerHostProvider
+
 	refreshInterval time.Duration
 }
 
-func NewHosts(hs settings.HostsSettings, rs settings.RedisSettings) Hosts {
+func NewHosts(hs models.HostsSettings, rs models.RedisSettings) Hosts {
 	fileHosts := &FileHosts{
 		file:  hs.HostsFile,
 		hosts: make(map[string]string),
 	}
 
 	var redisHosts *RedisHosts
+	pool := infrastructure.NewRedisConnection(rs)
 	if hs.RedisEnable {
 		rc := &redis.Client{Addr: rs.Addr(), Db: rs.DB, Password: rs.Password}
 		redisHosts = &RedisHosts{
@@ -35,7 +40,11 @@ func NewHosts(hs settings.HostsSettings, rs settings.RedisSettings) Hosts {
 		}
 	}
 
-	hosts := Hosts{fileHosts, redisHosts, time.Second * time.Duration(hs.RefreshInterval)}
+	hosts := Hosts{
+		fileHosts,
+		redisHosts,
+		targeting.NewRedisTargetingProvider(pool),
+		time.Second * time.Duration(hs.RefreshInterval)}
 	hosts.refresh()
 	return hosts
 
@@ -76,6 +85,25 @@ func (h *Hosts) Get(domain string, family int) ([]net.IP, bool) {
 	}
 
 	return ips, (ips != nil)
+}
+
+//TODO from config
+
+func (h *Hosts) GetByCaller(domain, caller string) ([]net.IP, bool) {
+	key := caller + "-" + domain
+
+	response, err := h.callerHosts.GetTargetedResponse(key)
+	if err != nil {
+		return nil, false
+	}
+	var ip net.IP
+	var ips []net.IP
+	for _, s := range response {
+		ip = net.ParseIP(s)
+		ips = append(ips, ip)
+	}
+
+	return ips, ips != nil
 }
 
 /*

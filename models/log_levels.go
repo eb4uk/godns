@@ -1,4 +1,4 @@
-package settings
+package models
 
 const (
 	LevelDebug = iota
