@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/eb4uk/godns/settings"
+	"github.com/eb4uk/godns/models"
 	"log"
 	"os"
 )
@@ -79,27 +79,27 @@ func (l *GoDNSLogger) writeMesg(mesg string, level int) {
 
 func (l *GoDNSLogger) Debug(format string, v ...interface{}) {
 	mesg := fmt.Sprintf("[DEBUG] "+format, v...)
-	l.writeMesg(mesg, settings.LevelDebug)
+	l.writeMesg(mesg, models.LevelDebug)
 }
 
 func (l *GoDNSLogger) Info(format string, v ...interface{}) {
 	mesg := fmt.Sprintf("[INFO] "+format, v...)
-	l.writeMesg(mesg, settings.LevelInfo)
+	l.writeMesg(mesg, models.LevelInfo)
 }
 
 func (l *GoDNSLogger) Notice(format string, v ...interface{}) {
 	mesg := fmt.Sprintf("[NOTICE] "+format, v...)
-	l.writeMesg(mesg, settings.LevelNotice)
+	l.writeMesg(mesg, models.LevelNotice)
 }
 
 func (l *GoDNSLogger) Warn(format string, v ...interface{}) {
 	mesg := fmt.Sprintf("[WARN] "+format, v...)
-	l.writeMesg(mesg, settings.LevelWarn)
+	l.writeMesg(mesg, models.LevelWarn)
 }
 
 func (l *GoDNSLogger) Error(format string, v ...interface{}) {
 	mesg := fmt.Sprintf("[ERROR] "+format, v...)
-	l.writeMesg(mesg, settings.LevelError)
+	l.writeMesg(mesg, models.LevelError)
 }
 
 type ConsoleHandler struct {

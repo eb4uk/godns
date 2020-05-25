@@ -10,21 +10,29 @@ import (
 
 const (
 	nameserver = "127.0.0.1:8553"
-	domain     = "www.sina.com.cn"
+	domain     = "www.sina.com"
+)
+
+var (
+	domains = []string{"www.sina.com", "google.com", "www.google.com"}
 )
 
 func TestDig(t *testing.T) {
-	m := new(dns.Msg)
-	m.SetQuestion(dns.Fqdn(domain), dns.TypeA)
+	for _, s := range domains {
+		m := new(dns.Msg)
+		m.SetQuestion(dns.Fqdn(s), dns.TypeA)
 
-	c := new(dns.Client)
-	exchange, rtt, err := c.Exchange(m, nameserver)
-	assert.NoError(t, err)
-	fmt.Println(exchange)
-	fmt.Println(rtt)
-	fmt.Println(err)
+		c := new(dns.Client)
+		exchange, rtt, err := c.Exchange(m, nameserver)
+		assert.NoError(t, err)
+		fmt.Println(exchange)
+		fmt.Println(rtt)
+		fmt.Println(err)
+	}
+
 }
 func BenchmarkDig(b *testing.B) {
+	b.ReportAllocs()
 	m := new(dns.Msg)
 	m.SetQuestion(dns.Fqdn(domain), dns.TypeA)
 

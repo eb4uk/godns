@@ -1,7 +1,7 @@
 package cache
 
 import (
-	"github.com/eb4uk/godns/settings"
+	"github.com/eb4uk/godns/models"
 	"github.com/hoisie/redis"
 	"github.com/miekg/dns"
 )
@@ -58,7 +58,7 @@ func (r *RedisCache) Full() bool {
 	return false
 }
 
-func NewRedisCache(rs settings.RedisSettings, expire int64) *RedisCache {
+func NewRedisCache(rs models.RedisSettings, expire int64) *RedisCache {
 	rc := &redis.Client{Addr: rs.Addr(), Db: rs.DB, Password: rs.Password}
 	return &RedisCache{
 		Backend: rc,

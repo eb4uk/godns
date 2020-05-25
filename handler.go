@@ -25,7 +25,7 @@ type GODNSHandler struct {
 func NewHandler() *GODNSHandler {
 
 	var (
-		cacheConfig       settings.CacheSettings
+		cacheConfig       models.CacheSettings
 		resolver          *Resolver
 		caching, negCache cache.Cache
 	)
@@ -43,7 +43,7 @@ func NewHandler() *GODNSHandler {
 	return &GODNSHandler{resolver, caching, negCache, hosts}
 }
 
-func selectCacheType(cacheConfig settings.CacheSettings) (caching cache.Cache, negCache cache.Cache) {
+func selectCacheType(cacheConfig models.CacheSettings) (caching cache.Cache, negCache cache.Cache) {
 	switch cacheConfig.Backend {
 	case "memory":
 		caching = &cache.MemoryCache{
@@ -91,10 +91,30 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 	} else {
 		remote = w.RemoteAddr().(*net.UDPAddr).IP
 	}
-	//TODO Check is specific key set up
+
 	logger.Info("%s lookup　%s", remote, Q.String())
 
 	IPQuery := h.isIPQuery(q)
+	// Query user specific hosts
+	if settings.Config.TargetResponse {
+		if ips, ok := h.hosts.GetByCaller(Q.Name, remote.String()); ok {
+			m := new(dns.Msg)
+			m.SetReply(req)
+			rr_header := dns.RR_Header{
+				Name:   q.Name,
+				Rrtype: dns.TypeA,
+				Class:  dns.ClassINET,
+				Ttl:    30,
+			}
+			for _, ip := range ips {
+				a := &dns.A{rr_header, ip}
+				m.Answer = append(m.Answer, a)
+			}
+			w.WriteMsg(m)
+			logger.Info("return targeted response %s", q.Name)
+			return
+		}
+	}
 
 	// Query hosts
 	if settings.Config.Hosts.Enable && IPQuery > 0 {
