@@ -8,6 +8,7 @@ require (
 	github.com/hoisie/redis v0.0.0-20160730154456-b5c6e81454e0
 	github.com/miekg/dns v1.1.29
 	github.com/smartystreets/goconvey v1.6.4
+	github.com/spaolacci/murmur3 v1.1.0
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.5.1

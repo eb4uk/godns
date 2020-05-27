@@ -11,11 +11,13 @@ type RedisCache struct {
 	Expire  int64
 }
 
+var cachePath = "godns:cache"
+
 func (r *RedisCache) Get(key string) (*dns.Msg, error) {
 	var msg dns.Msg
-	item, err := r.Backend.Get(key)
+	item, err := r.Backend.Get(r.buildKeyPath(key))
 	if err != nil {
-		err = KeyNotFound{key}
+		err = KeyNotFound{r.buildKeyPath(key)}
 		return &msg, err
 	}
 	err = msg.Unpack(item)
@@ -38,11 +40,11 @@ func (r *RedisCache) Set(key string, msg *dns.Msg) error {
 	if err != nil {
 		err = SerializerError{err}
 	}
-	return r.Backend.Setex(key, r.Expire, val)
+	return r.Backend.Setex(r.buildKeyPath(key), r.Expire, val)
 }
 
 func (r *RedisCache) Exists(key string) bool {
-	_, err := r.Backend.Get(key)
+	_, err := r.Backend.Get(r.buildKeyPath(key))
 	if err != nil {
 		return true
 	}
@@ -50,12 +52,15 @@ func (r *RedisCache) Exists(key string) bool {
 }
 
 func (r *RedisCache) Remove(key string) error {
-	_, err := r.Backend.Del(key)
+	_, err := r.Backend.Del(r.buildKeyPath(key))
 	return err
 }
 
 func (r *RedisCache) Full() bool {
 	return false
+}
+func (r *RedisCache) buildKeyPath(key string) string {
+	return cachePath + ":" + key
 }
 
 func NewRedisCache(rs models.RedisSettings, expire int64) *RedisCache {

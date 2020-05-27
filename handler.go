@@ -187,6 +187,10 @@ func (h *GODNSHandler) do(Net string, w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
+	if len(msg.Answer) > 0 {
+		msg.Answer[0].Header().Ttl = h.hosts.GetTtl(Q.Name, msg.Answer[0].Header().Ttl)
+	}
+
 	w.WriteMsg(msg)
 
 	if len(msg.Answer) > 0 {

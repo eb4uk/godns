@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/eb4uk/godns/cache"
 	"github.com/gomodule/redigo/redis"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,8 @@ import (
 type CallerHostProvider interface {
 	GetTargetedResponse(key string) (a []string, err error)
 }
+
+var targetRedisKey = "godns:target"
 
 type RedisCallerHostProvider struct {
 	c          redis.Conn
@@ -26,8 +29,6 @@ func NewRedisTargetingProvider(client redis.Conn) *RedisCallerHostProvider {
 	go r.startRefreshing()
 	return r
 }
-
-var targetRedisKey = "godns:target"
 
 func (r *RedisCallerHostProvider) startRefreshing() {
 	ticker := time.NewTicker(time.Second * 10)
@@ -55,5 +56,8 @@ func (r *RedisCallerHostProvider) GetTargetedResponse(key string) (a []string, e
 		return
 	}
 	a = strings.Split(s, ",")
+	rand.Shuffle(len(a), func(i, j int) {
+		a[i], a[j] = a[j], a[i]
+	})
 	return
 }

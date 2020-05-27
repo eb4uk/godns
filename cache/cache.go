@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/eb4uk/godns/models"
+	"github.com/spaolacci/murmur3"
+	"strconv"
 	"time"
 
 	"github.com/miekg/dns"
@@ -23,7 +25,22 @@ type Cache interface {
 	Full() bool
 }
 
+//TODO Move hash setting to config.
+
+//Murmur used for better performance
+var hashFunc func(q models.Question) string = hashMurmur
+
 func KeyGen(q models.Question) string {
+	return hashFunc(q)
+}
+
+func hashMurmur(q models.Question) string {
+	//murmur3.
+	x := murmur3.Sum64([]byte(q.String()))
+	return strconv.FormatInt(int64(x), 16)
+}
+
+func hashMd5(q models.Question) string {
 	h := md5.New()
 	h.Write([]byte(q.String()))
 	x := h.Sum(nil)

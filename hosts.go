@@ -5,6 +5,7 @@ import (
 	"github.com/eb4uk/godns/infrastructure"
 	"github.com/eb4uk/godns/models"
 	"github.com/eb4uk/godns/targeting"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -16,9 +17,10 @@ import (
 )
 
 type Hosts struct {
-	fileHosts   *FileHosts
-	redisHosts  *RedisHosts
-	callerHosts targeting.CallerHostProvider
+	fileHosts       *FileHosts
+	redisHosts      *RedisHosts
+	callerHosts     targeting.CallerHostProvider
+	customTtlSetter targeting.CustomTtlSetter
 
 	refreshInterval time.Duration
 }
@@ -30,7 +32,6 @@ func NewHosts(hs models.HostsSettings, rs models.RedisSettings) Hosts {
 	}
 
 	var redisHosts *RedisHosts
-	pool := infrastructure.NewRedisConnection(rs)
 	if hs.RedisEnable {
 		rc := &redis.Client{Addr: rs.Addr(), Db: rs.DB, Password: rs.Password}
 		redisHosts = &RedisHosts{
@@ -43,7 +44,8 @@ func NewHosts(hs models.HostsSettings, rs models.RedisSettings) Hosts {
 	hosts := Hosts{
 		fileHosts,
 		redisHosts,
-		targeting.NewRedisTargetingProvider(pool),
+		targeting.NewRedisTargetingProvider(infrastructure.NewRedisConnection(rs)),
+		targeting.NewRedisCustomTtlSetter(infrastructure.NewRedisConnection(rs)),
 		time.Second * time.Duration(hs.RefreshInterval)}
 	hosts.refresh()
 	return hosts
@@ -84,7 +86,7 @@ func (h *Hosts) Get(domain string, family int) ([]net.IP, bool) {
 		}
 	}
 
-	return ips, (ips != nil)
+	return ips, ips != nil
 }
 
 //TODO from config
@@ -104,6 +106,9 @@ func (h *Hosts) GetByCaller(domain, caller string) ([]net.IP, bool) {
 	}
 
 	return ips, ips != nil
+}
+func (h *Hosts) GetTtl(domain string, ttl uint32) uint32 {
+	return h.customTtlSetter.GetTtl(domain, ttl)
 }
 
 /*
@@ -151,7 +156,9 @@ func (r *RedisHosts) Get(domain string) ([]string, bool) {
 				continue
 			}
 			if sld == old {
-				return strings.Split(ip, ","), true
+				split := strings.Split(ip, ",")
+				rand.Shuffle(len(split), func(i, j int) { split[i], split[j] = split[j], split[i] })
+				return split, true
 			}
 		}
 	}
